@@ -55,11 +55,11 @@ const fetchPostCtlr = expressAsyncHandler(async(req, res) => {
        //Check If It Has Category
         
        if(hasCategory){
-        const post = await Post.find({category: hasCategory}).populate('user');
+        const post = await Post.find({category: hasCategory}).populate('user').populate('comment');
       
         res.json(post);
        }else{
-        const allpost = await Post.find({}).populate('user');
+        const allpost = await Post.find({}).populate('user').populate('comment');
         res.json(allpost);
        }
       
@@ -75,7 +75,7 @@ const fetchSinglePostCtlr = expressAsyncHandler(async(req, res) => {
   
   try{
      
-    const post = await Post.findById(id).populate("user").populate("disLikes").populate("likes");
+    const post = await Post.findById(id).populate("user").populate("disLikes").populate("likes").populate('comment');
 
     //Update Number Of Views
      await Post.findByIdAndUpdate(id, {
@@ -120,11 +120,11 @@ const updatePostCtlr = expressAsyncHandler(async(req, res) => {
 const deletePostCtlr = expressAsyncHandler(async(req, res) => {
   const { id } = req.params
   ValidateMongoDbId(id);
-console.log("id==", id)
+
   try{
    
      const post = await Post.findByIdAndDelete(id);
-     console.log("post==++", post)
+     
      res.json(post);
   }catch(error){
     res.json(error);
