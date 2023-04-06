@@ -6,7 +6,7 @@ const CommentRoutes = express.Router();
 
 CommentRoutes.post('/',authMiddleware, createCommentCtlr);
 
-CommentRoutes.get('/',authMiddleware, fetchAllCommentCtlr);
+CommentRoutes.get('/',  fetchAllCommentCtlr);
 
 CommentRoutes.get('/:id',authMiddleware, fetchSingleCommentCtlr);
 
