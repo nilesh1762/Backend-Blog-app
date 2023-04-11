@@ -38,7 +38,7 @@ userRoutes.put('/unblock-user/:id', authMiddleware, unBlockUserCtlr);
 
 userRoutes.post('/send-mail', geerateVarificationtokenctlr);
 
-userRoutes.put('/:id', authMiddleware, updateUser);
+userRoutes.put('/', authMiddleware, updateUser);
 
 userRoutes.patch('/updatePassword/:id',authMiddleware, updatedPassword);
 

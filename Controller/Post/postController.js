@@ -11,7 +11,10 @@ const createPostCtlr = expressAsyncHandler(async(req, res) => {
 
       const { _id } = req.user;
     //   ValidateMongoDbId(req.body.user);
-
+    //Block User
+    if (req.user?.isBlocked) {
+      throw new Error(`Access Denied ${req.user?.firstName} is blocked`);
+    }
       let filter = new Filter();
        const profaneWords = filter.isProfane(req.body.title, req.body.description);
 
@@ -55,11 +58,11 @@ const fetchPostCtlr = expressAsyncHandler(async(req, res) => {
        //Check If It Has Category
         
        if(hasCategory){
-        const post = await Post.find({category: hasCategory}).populate('user').populate('comment');
+        const post = await Post.find({category: hasCategory}).populate('user').populate('comment').sort("-createdAt");
       
         res.json(post);
        }else{
-        const allpost = await Post.find({}).populate('user').populate('comment');
+        const allpost = await Post.find({}).populate('user').populate('comment').sort("-createdAt");
         res.json(allpost);
        }
       

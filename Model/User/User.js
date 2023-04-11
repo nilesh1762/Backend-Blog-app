@@ -4,23 +4,75 @@ const validator = require('validator');
 const crypto = require('crypto');
 // Create UserSchema object
 
+var validateEmail = function(email) {
+   var re = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+   return re.test(email)
+};
+
 const UserSchema = new mongoose.Schema({
  firstName: {
     required: [true, "First Name is Required"],
-    type: String
+    type: String,
+    trim: true,
+    text: true
  },
 
  lastName: {
     required: [true, "Last Name is Required"],
-    type: String
+    type: String,
+    trim: true,
+    text: true
+ },
+ username: {
+   required: [true, "User Name is Required"],
+   type: String,
+   trim: true,
+   text: true,
+   unique: true
  },
  profileImage: {
     type: String,
+    trim: true,
     default: "https://www.nps.gov/articles/000/images/Ranger_ValerieLamm.png"
+ },
+ cover: {
+   type: String,
+   trim: true
  },
  email:{
     required: [true, "Email is Required"],
-    type: String
+    type: String,
+    trim: true,
+    validate: [validateEmail, 'Please fill a valid email address here.'],
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+ },
+ gender: {
+   required: [true, "Gender is Required"],
+    type: String,
+    trim: true
+ },
+ birthYear: {
+   required: true,
+   type: Number,
+   trim: true
+ },
+ birthMonth: {
+   required: true,
+   type: Number,
+   trim: true
+ },
+ birthDay: {
+   required: true,
+   type: Number,
+   trim: true
+ },
+ friends: {
+   type: Array,
+   default: []
+ },
+ request: {
+   type: Array,
+   default: []
  },
  bio:{
     type: String,
@@ -69,6 +121,60 @@ const UserSchema = new mongoose.Schema({
   isAccountVerified:{
     type: Boolean,
     default: false
+  },
+  search: [
+   {
+      user: {
+         type: mongoose.Schema.ObjectId,
+         ref: "User"
+      }
+   }
+  ],
+  details: {
+   bio:{
+      type: String,
+   },
+   otherName:{
+      type: String,
+   },
+   job:{
+      type: String,
+   },
+   workPlace:{
+      type: String,
+   },
+   highschool:{
+      type: String,
+   },
+   college:{
+      type: String,
+   },
+   currentCity:{
+      type: String,
+   },
+   homeTown:{
+      type: String,
+   },
+   reationShip:{
+      type: String,
+      enum: ['Single', 'In a Relationship', "Married", "Divorced", "For Fun And Gun"]
+   },
+   savePost: [
+      {
+         post:{
+            type:mongoose.Schema.ObjectId,
+            ref: "Post"
+         },
+         saveAt: {
+            type: Date,
+            default: new Date()
+         }
+      }
+
+   ],
+   instagram:{
+      type: String,
+   },
   },
   accountVerificationtoken: String,
   accountVerificationtokenExpire: Date,
@@ -133,6 +239,11 @@ UserSchema.virtual('post', {
    ref: 'Post',
    foreignField: 'user',
     localField: '_id'
+})
+
+UserSchema.virtual("accountType").get(function() {
+   const totalFollowers = this.followers?.length;
+   return totalFollowers >= 10 ? "Pro-Account" : "Starter-Account"
 })
 
 UserSchema.pre('save', async function(next){

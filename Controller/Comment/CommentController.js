@@ -1,17 +1,23 @@
 const expressAsyncHandler = require('express-async-handler');
 
 const Comment = require('../../Model/Comment/Comment');
-const AppError = require('../../Utils/AppEroor');
+const blockUser = require('../../Utils/AppEroor');
 const ValidateMongoDbId = require('../../Utils/ValidateMongoDbId');
 //Create Comment
 
 const createCommentCtlr = expressAsyncHandler(async(req, res) => {
- 
+
   // Get the user
   const user = req.user;
+
+  // Block User
+  if (user?.isBlocked) {
+    throw new Error(`Access Denied ${user?.firstName} is blocked`);
+  }
+
   //Get the PostId
   const { postId, description } = req.body;
-    console.log(`Comment: ${description}`);
+   // console.log(`Comment: ${postId}`);
   try{
       
     const comment = await Comment.create({

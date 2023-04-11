@@ -9,6 +9,8 @@ const sendEmail  = require('./../../Utils/email');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const cloudnaryUploadImage = require('../../Utils/Cloudniary');
+const nodemailer = require("nodemailer");
+const { validateUsername } = require('../../Utils/validateUsername');
 
 
 sgMails.setApiKey(process.env.SENDGRID_API_KEY)
@@ -56,14 +58,55 @@ const createSendtoken = (user, statuscode, res) => {
 }
 
 const UserRegisterCtlr = expressAsyncHandler(async (req, res) => {
+ 
     //Register User
     //Check If User Exits
-    const UserExits = await User.findOne({email: req?.body.email});
+   //  const UserExits = await User.findOne({email: req?.body?.email });
+   //  const UserName = await User.findOne({username: req?.body?.username});
 
-    if(UserExits) throw new Error("User Already Exists.")
+   //  if(UserExits) throw new Error("User Email Already Exists, try With Another Email.")
+   //  if( UserName) throw new Error("User Name Already Exists. Please Choose Another User Name.")
  
-   const newUser = await User.create(req.body);
-    createSendtoken(newUser, 201, res)
+   // const newUser = await User.create(req.body);
+   try{
+      const {
+         firstName,
+         lastName,
+         email,
+         password,
+         passwordConfirm,
+         username,
+         birthYear,
+         birthMonth,
+         birthDay,
+         gender,
+       } = req.body;
+   
+       const UserExits = await User.findOne({email: req?.body?.email });
+       
+       if(UserExits) throw new Error("User Email Already Exists, try With Another Email.");
+
+       let tempUsername = firstName + lastName;
+       let newUsername = await validateUsername(tempUsername);
+
+       const user = await new User({
+         firstName,
+         lastName,
+         email,
+         password,
+         passwordConfirm,
+         username: newUsername,
+         birthYear,
+         birthMonth,
+         birthDay,
+         gender,
+       }).save();
+
+       createSendtoken(user, 201, res)
+   } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  
    
 
 })
@@ -97,7 +140,7 @@ if(!email || !password){
 
   //check if user exit and password correct
   const user =  await User.findOne({ email }).select('+password')
-      
+    
 
   if(!user || (!await user.correctPassword(password, user.password))){
       return next(new AppError('Incorrect email or password.', 401))
@@ -111,7 +154,7 @@ if(!email || !password){
 const fetchUserCtlr = expressAsyncHandler(async (req, res) => {
    // console.log("Beraer===", req.headers);
      try{
-          const users = await User.find({});
+          const users = await User.find({}).populate('post');
           
           res.json(users)
      }catch(error){
@@ -158,11 +201,29 @@ const fetchUserDetailCtlr = expressAsyncHandler(async (req, res) => {
 const userProfile = expressAsyncHandler(async (req, res) => {
    //console.log("Beraer===s", req.headers);
    const { id} = req.params;
-   //console.log(id);
+  
     ValidateMongoDbId(id)
+
+    const loginuserId = req?.user?._id?.toString();
+  
     try{
-        const myProfile = await User.findById(id).populate("post");
-        res.json(myProfile)
+        const myProfile = await User.findById(id).populate("post").populate("viewedBy");
+        const alreadyView = myProfile?.viewedBy?.find(user => {
+        // console.log("loginuserId===", user);
+          return user?._id?.toString() === loginuserId;
+
+        });
+       
+        if(alreadyView){
+         res.json(myProfile)
+        }else{
+        const profile = await User.findByIdAndUpdate(myProfile?._id?.toString(), {
+         $push: {viewedBy: loginuserId}
+        });
+       
+        res.json(profile)
+        }
+     
     }catch (error){
         res.json(error)
         
@@ -180,6 +241,11 @@ const updateUser = expressAsyncHandler(async (req, res, next) => {
 
        const { _id } = req.user;
        ValidateMongoDbId(_id);
+
+       //Block User
+       if (req.user?.isBlocked) {
+         throw new Error(`Access Denied ${req.user?.firstName} is blocked`);
+       }
 
        const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
          new: true,
@@ -430,22 +496,50 @@ const generateVerificationMailctlr = expressAsyncHandler(async(req, res, next) =
    const user = await User.findById(loginuser);
   
   try{
-    const verificationToken = await user.createAccountverifyToken();
+    const verificationToken = await user?.createAccountverifyToken();
     await user.save()
    
-    const resetURL = `If you are requested to verify your account verify in next 10 minutes. Click on the link <a href="http://localhost:5000/api/users/verify-account/${verificationToken}">
+    const resetURL = `If you are requested to verify your account verify in next 10 minutes. Click on the link <a href="http://localhost:3000/verify-account/${verificationToken}">
     Verify Account </a>`;
 
-   const msg = {
-      to: 'nileshsingh1762@gmail.com', // Change to your recipient
-      from: 'kumarnile@gmail.com', // Change to your verified sender
-      subject: 'Sending with My BlogApp is Fun',
-      html: resetURL,
+   // const msg = {
+   //    to: user?.email, // Change to your recipient
+   //    from: 'kumarnile@gmail.com', // Change to your verified sender
+   //    subject: 'Sending with My BlogApp is Fun',
+   //    html: resetURL,
       
-    }
-       
-    await sgMails.send(msg);
-    res.json(resetURL)
+   //  }
+  
+   //  await sgMails.send(msg);
+   //  res.json(resetURL)
+
+   const transporter = nodemailer.createTransport({
+
+      service: "gmail",
+      auth: {
+         user: process.env.EMAIL,
+         pass: process.env.PASSWORD
+      }
+   });
+
+   const mailoption = {
+      from: process.env.EMAIL,
+      to: user?.email,
+      subject: 'Sending with My BlogApp',
+      html: resetURL,
+   }
+
+   transporter.sendMail(mailoption, (error, info) => {
+  
+      if(error){
+         console.log("Mail-Err===", error)
+      }else{
+         // console.log("Email-Sent===", resetURL, info);
+         res.json(resetURL)
+      }
+      
+
+   })
 
   }catch(err){
        res.json(err)
@@ -458,13 +552,13 @@ const generateVerificationMailctlr = expressAsyncHandler(async(req, res, next) =
 const accountVerificationctlr = expressAsyncHandler(async(req, res, next) => {
 
    const {token } = req.body
-
+   
    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
    const userFound = await User.findOne({
       accountVerificationtoken: hashedToken,
       accountVerificationtokenExpire: {$gt: new Date()}
    })
- 
+   console.log("token===", token, userFound)
    if(!userFound) throw new Error("User token expire. Please try again.");
 
     userFound.isAccountVerified = true;
@@ -492,6 +586,11 @@ const userProfilectlr = expressAsyncHandler(async(req, res, next) => {
     // Find the Login User
 
     const { _id } = req.user
+
+    // User Block
+    if (req.user?.isBlocked) {
+      throw new Error(`Access Denied ${req.user?.firstName} is blocked`);
+    }
 
     const userFound = await User.findByIdAndUpdate(_id, {
       profileImage: imgUpload?.url
